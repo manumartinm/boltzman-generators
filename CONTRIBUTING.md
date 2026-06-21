@@ -22,6 +22,8 @@ uv run twine check dist/*
 
 ## Pull request guidelines
 
+- Open PRs against `main`; CI runs automatically on each PR.
+- To release: bump version in `pyproject.toml` + `__init__.py`, update `CHANGELOG.md`, merge — CD publishes on merge.
 - Keep changes focused and scoped to a clear problem.
 - Add or update tests for behavior changes.
 - Update docs when public APIs change.
