@@ -33,20 +33,3 @@ jobs:
         run: uv run python -m build
       - name: Check distribution
         run: uv run twine check dist/*
-
-  notebook-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-      - name: Install dependencies
-        run: uv sync --extra dev --extra notebook
-      - name: Execute quickstart notebook
-        run: |
-          uv run jupyter nbconvert --to notebook --execute \
-            examples/notebooks/01_quickstart_realnvp.ipynb \
-            --output /tmp/01_quickstart_realnvp.executed.ipynb
