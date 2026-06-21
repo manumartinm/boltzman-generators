@@ -1,0 +1,107 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  detect-version-bump:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Detect version bump
+        id: detect
+        run: |
+          CURRENT=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          PREVIOUS=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version = ' | head -1 | sed 's/version = "\(.*\)"/\1/' || true)
+
+          if [ -z "$CURRENT" ]; then
+            echo "Could not read version from pyproject.toml"
+            exit 1
+          fi
+
+          echo "Current version:  $CURRENT"
+          echo "Previous version: ${PREVIOUS:-<none>}"
+
+          if [ "$CURRENT" != "$PREVIOUS" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No version bump detected; skipping release."
+          fi
+
+  validate-changelog:
+    needs: detect-version-bump
+    if: needs.detect-version-bump.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify changelog contains release version
+        env:
+          VERSION: ${{ needs.detect-version-bump.outputs.version }}
+        run: |
+          if ! grep -q "\[${VERSION}\]" CHANGELOG.md; then
+            echo "CHANGELOG.md is missing section for version ${VERSION}"
+            exit 1
+          fi
+
+  release:
+    needs: [detect-version-bump, validate-changelog]
+    if: needs.detect-version-bump.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Install build tools
+        run: uv sync --extra dev
+      - name: Build package
+        run: uv run python -m build
+      - name: Check distribution
+        run: uv run twine check dist/*
+      - name: Create git tag
+        env:
+          VERSION: ${{ needs.detect-version-bump.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; skipping tag creation."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release ${TAG}"
+          git push origin "$TAG"
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+      - name: Create GitHub Release
+        env:
+          VERSION: ${{ needs.detect-version-bump.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub release ${TAG} already exists; skipping."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --title "v${VERSION}" \
+            --notes "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md#${VERSION//./}) for details."

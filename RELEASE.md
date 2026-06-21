@@ -1,11 +1,18 @@
 # Release Checklist
 
-Follow this checklist for every PyPI release.
+Releases are automated on merge to `main` when the version is bumped.
 
-## Pre-release
+## Workflow
 
-1. Ensure `main` is green in CI (lint, mypy, tests, coverage >= 75%, build).
-2. Update version in:
+| Event | Workflow | Action |
+|---|---|---|
+| Pull request → `main` | `CI` | lint, mypy, tests, coverage, build |
+| Merge to `main` | `CD` | detect version bump → tag + PyPI publish (if bumped) |
+
+## Pre-merge (in your PR)
+
+1. Ensure CI is green on the PR.
+2. Bump version in:
    - `pyproject.toml`
    - `src/boltzmann_generators/__init__.py`
    - `CITATION.cff` (optional but recommended)
@@ -18,23 +25,23 @@ Follow this checklist for every PyPI release.
    - Security
 4. Update README badges/examples if public API changed.
 
-## Release
+## What happens on merge
 
-```bash
-git checkout main
-git pull
-uv sync --extra dev
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src
-uv run pytest
-uv run python -m build
-uv run twine check dist/*
-git tag vX.Y.Z
-git push origin main --tags
-```
+If `pyproject.toml` version differs from the previous commit on `main`:
 
-The `release.yml` workflow validates the changelog entry and publishes to PyPI via trusted publishing (OIDC).
+1. CD validates the changelog entry exists for that version.
+2. CD creates git tag `vX.Y.Z`.
+3. CD builds and publishes to PyPI.
+4. CD creates a GitHub Release.
+
+If the version was **not** bumped, CD exits without publishing.
+
+## Required secrets / configuration
+
+- GitHub secret: `PYPI_TOKEN` (PyPI API token with upload scope)
+- GitHub environment: `pypi` (optional protection rules)
+
+Alternatively, replace the publish step with PyPI trusted publishing (OIDC) and remove `PYPI_TOKEN`.
 
 ## Post-release
 
@@ -45,5 +52,4 @@ pip install boltzmann-generators==X.Y.Z
 python -c "import boltzmann_generators; print(boltzmann_generators.__version__)"
 ```
 
-2. Create a GitHub release from the tag and paste the changelog section.
-3. Smoke-run `examples/notebooks/01_quickstart_realnvp.ipynb`.
+2. Smoke-run `examples/notebooks/01_quickstart_realnvp.ipynb`.
