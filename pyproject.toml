@@ -1,6 +1,6 @@
 [project]
 name = "boltzmann-generators"
-version = "0.2.0"
+version = "0.2.1"
 description = "Boltzmann Generators in PyTorch: flows, energies, losses, and sampling utilities."
 readme = "README.md"
 license = "MIT"
