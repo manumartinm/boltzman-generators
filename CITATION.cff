@@ -7,8 +7,8 @@ authors:
     given-names: Manu
 repository-code: "https://github.com/manumartinm/boltzmann-generators"
 license: MIT
-version: 0.2.0
-date-released: 2026-06-20
+version: 0.2.1
+date-released: 2026-06-21
 preferred-citation:
   type: article
   authors:

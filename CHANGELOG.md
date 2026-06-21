@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-21
+
+### Changed
+
+- CI now runs on pull requests to `main` only.
+- CD runs on merge to `main` and publishes to PyPI when the version is bumped.
+- Release automation creates git tags and GitHub releases on version bump.
+
 ## [0.2.0] - 2026-06-20
 
 ### Added
