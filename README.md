@@ -1,74 +1,104 @@
-# boltzmann_generators
+# boltzmann-generators
 
-Personal study repo for **Boltzmann Generators**.
+[![CI](https://github.com/manumartinm/boltzmann-generators/actions/workflows/ci.yml/badge.svg)](https://github.com/manumartinm/boltzmann-generators/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/boltzmann-generators)](https://pypi.org/project/boltzmann-generators/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Material de referencia:
+PyTorch tools for Boltzmann Generators: invertible flows, benchmark energy functions, BG losses, and reweighting diagnostics (ESS and free-energy differences). The project is designed for reproducible experiments on toy molecular systems and as a base for transferable BG research.
 
-1. **Original** — Noé, Olsson, Köhler, Wu, *"Boltzmann Generators: Sampling Equilibrium States of Many-Body Systems with Deep Learning"*, Science 2019 (arXiv 1812.01729). Repo: https://github.com/noegroup/paper_boltzmann_generators
-2. **Transferable** — Klein & Noé, *"Transferable Boltzmann Generators"*, NeurIPS 2024. https://openreview.net/forum?id=AYq6GxxrrY
+## References
 
-Aproximación: teoría primero (markdown notes), implementación propia en PyTorch desde cero, validación contra el repo original.
+1. Noé, Olsson, Köhler, Wu, *Boltzmann Generators: Sampling Equilibrium States of Many-Body Systems with Deep Learning* (Science, 2019): <https://arxiv.org/abs/1812.01729>
+2. Klein, Noé, *Transferable Boltzmann Generators* (NeurIPS, 2024): <https://openreview.net/forum?id=AYq6GxxrrY>
+3. Original reference implementation: <https://github.com/noegroup/paper_boltzmann_generators>
 
-## Roadmap
+## Installation
 
-- [x] **M1** — Setup folder, uv project, clonar repo de referencia
-- [x] **M2** — Teoría: statistical mechanics + normalizing flows (`theory/01`, `theory/02`)
-- [x] **M3** — RealNVP desde cero (`src/bg/flows/`, notebook 02 — Gaussian mixture, NLL 2.23 nats vs entropía 2.13)
-- [x] **M4** — Teoría: Boltzmann Generators (`theory/03`)
-- [x] **M5** — BG en double-well (notebook 03, ESS 98%, ΔF=+0.004 kT vs true 0)
-- [x] **M6** — BG en Müller-Brown (notebook 04, ESS 96%, populations within 0.2% de ground truth)
-- [x] **M7** — Diff vs repo original (notebook 05, ESS 92%)
-- [x] **M8** — Teoría: flow matching + transferable BG (`theory/04`, `theory/05`)
-- [x] **M9** — Flow matching desde cero (`src/bg/flows/cnf.py`, notebook 06)
-- [x] **M10** — Dipeptide sintético (notebook 07, Ramachandran-flavored, sin OpenMM)
-
-Notebook 01 (`01_toy_double_well.ipynb`) del plan original quedó absorbido por el 03 — la exploración del double-well + MCMC baseline está integrada allí.
-
-## Layout
-
-```
-theory/      notas markdown por tema
-src/bg/      paquete propio
-  flows/     base + RealNVP + CNF
-  energies/  double-well, Müller-Brown, Ramachandran dipeptide
-  losses.py  KL_x, KL_z, mixed
-  sampling.py  sample + reweight + ESS + ΔF
-notebooks/   experimentos numerados (02–07)
-references/  PDFs + clone del repo de Noé
-data/        trayectorias/checkpoints (gitignored)
+```bash
+pip install boltzmann-generators
 ```
 
-## Setup
+For notebooks and plots:
 
-```sh
-uv sync                       # instala deps + bg en modo editable
-uv run jupyter lab            # arranca notebooks
+```bash
+pip install "boltzmann-generators[notebook]"
 ```
 
-Si `references/paper_boltzmann_generators/` no existe (gitignored):
+For development:
 
-```sh
+```bash
+pip install "boltzmann-generators[dev]"
+```
+
+For higher-accuracy CNF ODE integration:
+
+```bash
+pip install "boltzmann-generators[ode]"
+```
+
+## Quickstart
+
+```python
+import torch
+from boltzmann_generators.energies import DoubleWell2D
+from boltzmann_generators.flows import FlowModel, GaussianPrior, RealNVP
+from boltzmann_generators.training import TrainConfig, Trainer
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+energy = DoubleWell2D()
+prior = GaussianPrior(dim=2).to(device)
+flow = RealNVP(dim=2, num_layers=8, hidden_dim=64, mask="halves").to(device)
+model = FlowModel(prior, flow).to(device)
+
+config = TrainConfig(n_epochs=200, batch_size=256, lr=1e-3, w_ml=0.0, w_kl=1.0)
+trainer = Trainer(model, energy, config, device=device)
+history = trainer.fit(x_data=None)
+print("Final loss:", history[-1]["loss"])
+```
+
+## Project layout
+
+```text
+src/boltzmann_generators/
+  base/                # EnergyModel and BaseDensityModel ABCs
+  training/            # Trainer and loss strategy classes
+  services/            # SamplingEngine, AnalysisSuite, CheckpointManager
+  energies/            # double-well, Muller-Brown, Ramachandran-like energy
+  flows/               # base flow API, RealNVP, CNF
+  losses.py            # KL_x, KL_z, mixed loss (function wrappers)
+  sampling.py          # weighted samples, ESS, free-energy difference
+  mcmc.py              # Metropolis baseline sampler
+  train.py             # deprecated train_bg wrapper
+  analysis.py          # basin and population utilities
+
+examples/notebooks/    # curated runnable examples
+notebooks/             # end-to-end reproductions (02-07)
+```
+
+## Reproduced results
+
+| Notebook | System | Metric | Value |
+|---|---|---|---|
+| 02 | 4-mode Gaussian mixture | Final NLL | 2.23 nats (target entropy: 2.13) |
+| 03 | Double-well 2D (4 kT barrier) | ESS / DeltaF | 98% / +0.004 kT (target 0) |
+| 04 | Muller-Brown (3 basins) | ESS / populations | 96% / target [80.37, 7.74, 11.89]%, BG [80.23, 7.71, 12.05]% |
+| 05 | Double-well paper comparison | ESS | 92% |
+| 06 | Gaussian mixture (CFM) | Visual mode coverage | All 4 modes recovered |
+| 07 | Synthetic Ramachandran | Visual + basin populations | Reweighted BG close to ground truth |
+
+## Documentation
+
+- Example notebooks: [`examples/notebooks/`](examples/notebooks/)
+- Migration guide (0.1 → 0.2): [`MIGRATION.md`](MIGRATION.md)
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- Release process: [`RELEASE.md`](RELEASE.md)
+- Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Research notebooks: `notebooks/`
+
+If you need the original Noé group reference repository locally, clone it into:
+
+```bash
 git clone --depth 1 https://github.com/noegroup/paper_boltzmann_generators.git references/paper_boltzmann_generators
 ```
-
-## Stack
-
-PyTorch 2.12 (MPS en Apple Silicon, CUDA en NVIDIA), numpy, matplotlib, jupyterlab, pandas. **Sin dependencias de MD** — todo el roadmap usa potenciales analíticos 2D. `torchdiffeq` NO fue necesario: el CNF en `bg.flows.cnf` usa integración Euler manual (suficiente para 2D). Para escalar a más dimensiones, considerar añadirlo.
-
-## Resultados destacados
-
-| Notebook | Sistema | Métrica | Valor |
-|---|---|---|---|
-| 02 | 4-mode Gaussian mixture | NLL final | 2.23 nats (entropía 2.13) |
-| 03 | Double-well 2D (barrier 4 kT) | ESS / ΔF | 98% / +0.004 kT (true 0) |
-| 04 | Müller-Brown (3 minima) | ESS / pops | 96% / true [80.37, 7.74, 11.89]%, BG [80.23, 7.71, 12.05]% |
-| 05 | Double-well (Fig 2 paper) | ESS | 92% |
-| 06 | Gaussian mixture (CFM) | Visual | 4 modos cubiertos vía ODE Euler |
-| 07 | Ramachandran sintético | Visual + pops | BG-reweighted ≈ ground truth en 4 basins |
-
-## Para continuar
-
-- **M10b** — periodicity correcta vía embedding angular (notebook 07 sección 7).
-- **M10c** — trayectorias MD reales de alanine dipeptide vía `mdshare` (sin OpenMM).
-- E(3)-equivariant flows (Köhler 2020, Klein 2023).
-- FAB / Annealed Importance Sampling Bootstrap (Midgley 2023) — mejora reweighting.

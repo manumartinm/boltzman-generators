@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: boltzmann-generators
+message: "If you use this software, please cite this repository and the original papers."
+type: software
+authors:
+  - family-names: Martin
+    given-names: Manu
+repository-code: "https://github.com/manumartinm/boltzmann-generators"
+license: MIT
+version: 0.2.0
+date-released: 2026-06-20
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Noe
+      given-names: Frank
+    - family-names: Olsson
+      given-names: Simon
+    - family-names: Kohler
+      given-names: Jonas
+    - family-names: Wu
+      given-names: Hao
+  title: "Boltzmann Generators: Sampling Equilibrium States of Many-Body Systems with Deep Learning"
+  journal: Science
+  year: 2019
+  volume: 365
+  issue: 6457
+  doi: 10.1126/science.aaw1147
